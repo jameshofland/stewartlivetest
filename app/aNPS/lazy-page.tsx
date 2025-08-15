@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import dynamic from "next/dynamic"
-import { LoadingFallback } from "@/components/loading-fallback"
+import dynamic from "next/dynamic";
+import { LoadingFallback } from "@/components/loading-fallback";
 
-const ANPSDashboard = dynamic(() => import("./app/page"), {
+const ANPSDashboard = dynamic(() => import("./page"), {
   loading: () => (
     <LoadingFallback
       title="Loading aNPS Dashboard"
@@ -11,8 +11,8 @@ const ANPSDashboard = dynamic(() => import("./app/page"), {
     />
   ),
   ssr: false,
-})
+});
 
 export default function LazyANPSPage() {
-  return <ANPSDashboard />
+  return <ANPSDashboard />;
 }

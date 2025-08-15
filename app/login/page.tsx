@@ -1,19 +1,19 @@
-'use client'
+"use client";
 
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { createClient } from '@/lib/supabase'
 import { AlertCircle, Chrome } from 'lucide-react'
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = getSupabaseBrowserClient();
 
   useEffect(() => {
     // Check if user is already logged in

@@ -1,23 +1,20 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { createClient } from "@supabase/supabase-js"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Moon, Sun, Eye, AlertTriangle, ChevronLeft, ChevronRight, Loader2, Filter } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { HomeButton } from "@/components/navigation"
+import { useState, useEffect } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-// Initialize Supabase client
-// ✅ Use public anon key in the browser
-import { createClient } from '@/lib/supabase' // your existing public client helper
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Moon, Sun, Eye, AlertTriangle, ChevronLeft, ChevronRight, Loader2, Filter } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { HomeButton } from "@/components/navigation"; // named import
 
-const supabase = createClient()
+const supabase = getSupabaseBrowserClient();
 
 interface Transaction {
   id: string

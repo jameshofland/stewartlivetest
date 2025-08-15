@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
+import { getSupabaseBrowserClient } from "@/lib/supabase"
 
 export default function AuthTestPage() {
-  const supabase = createClient()
-
+  const supabase = getSupabaseBrowserClient()
+  
   useEffect(() => {
     console.log('✅ Supabase client initialized')
 
