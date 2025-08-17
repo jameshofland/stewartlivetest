@@ -398,16 +398,16 @@ export default function TransactionDashboard() {
     }
   }
 
+  const fmtMoney = (n?: number | string | null) =>
+    n === null || n === undefined || n === ''
+      ? '—'
+      : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
+          .format(typeof n === 'number' ? n : Number(n))
+
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp)
     const now = new Date()
     const isToday = date.toDateString() === now.toDateString()
-
-    const fmtMoney = (n?: number | string | null) =>
-      n === null || n === undefined || n === ''
-        ? '—'
-        : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-            .format(typeof n === 'number' ? n : Number(n))
 
     if (isToday) {
       return `Today at ${date.toLocaleTimeString("en-US", {
