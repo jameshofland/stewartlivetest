@@ -189,44 +189,51 @@ export default function TransactionDashboard() {
     setTransactionsLoading(true)
     try {
       let query = buildTransactionsQuery()
-
-      // Apply cursor pagination
+  
+      // Keep your existing cursor behavior (start after this TRX ID)
       if (cursor && cursor !== "") {
         query = query.gt("trx_id", cursor)
       }
-
-      query = query.order("trx_id", { ascending: true }).limit(rowsPerPage + 1)
-
+  
+      // ✅ Deterministic ordering that matches the composite index:
+      // primary: newest first; tie-break: trx_id ascending
+      query = query
+        .order("last_updated", { ascending: false })
+        .order("trx_id", { ascending: true })
+        .limit(rowsPerPage + 1)
+  
       const { data, error, count } = await query
-
+  
       if (error) {
         console.error("Error fetching transactions:", error)
         return
       }
-
-      const hasMore = data && data.length > rowsPerPage
-      const transactions = hasMore ? data.slice(0, rowsPerPage) : data || []
-
-      setTransactions(transactions)
-
-      // Update pagination state
+  
+      const hasMore = !!data && data.length > rowsPerPage
+      const pageRows = hasMore ? data.slice(0, rowsPerPage) : (data || [])
+  
+      setTransactions(pageRows)
+  
+      // Maintain your existing cursor stack (stores the starting cursor for each page)
       const newCursors = [...transactionsPagination.cursors]
       if (page > newCursors.length - 1) {
         newCursors.push(cursor || "")
       }
-
+  
       setTransactionsPagination({
         currentPage: page,
         hasNextPage: hasMore,
         hasPrevPage: page > 1,
         cursors: newCursors,
-        totalCount: count || 0,
+        totalCount: count ?? transactionsPagination.totalCount ?? 0,
       })
     } catch (error) {
       console.error("Error fetching transactions:", error)
+    } finally {
+      setTransactionsLoading(false)
     }
-    setTransactionsLoading(false)
   }
+  
 
   const fetchUnmatchedTransactions = async (page: number, cursor?: string) => {
     setUnmatchedLoading(true)

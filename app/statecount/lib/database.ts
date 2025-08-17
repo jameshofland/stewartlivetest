@@ -1,267 +1,289 @@
-import { supabase } from "./supabase"
+'use client';
+import { getSupabaseBrowserClient } from './supabase';
 
-const fetchAllHistory = async () => {
-  const pageSize = 1000
-  const allRows: any[] = []
-  let from = 0
-  let to = pageSize - 1
+// ───────────────────────────────────────────────────────────────────────────────
+// Row types
+export interface StateHistoryRow {
+  state: string;
+  region: string | null;
+  month: string;         // "YYYY-MM"
+  total_count: number;
+}
+
+export interface StateCurrentRow {
+  state: string;
+  region: string | null;
+  open_count: number;
+  closed_count: number;
+  withdrawn_count: number;
+}
+
+export type Option = { value: string; label: string };
+
+// Month label helper (e.g., "2025-07" -> "Jul 2025")
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const labelMonth = (yyyyMm: string): string => {
+  const [y, m] = yyyyMm.split('-');
+  const mi = Math.max(1, Math.min(12, Number(m))) - 1;
+  return `${MONTHS[mi]} ${y}`;
+};
+
+// Fetch all history with pagination (typed)
+export const fetchAllHistory = async (): Promise<StateHistoryRow[]> => {
+  const supabase = getSupabaseBrowserClient();
+  const pageSize = 1000;
+  const allRows: StateHistoryRow[] = [];
+  let from = 0;
+  let to = pageSize - 1;
 
   while (true) {
     const { data, error } = await supabase
-      .from("zstate_file_history")
-      .select("state, region, month, total_count", { count: "exact" })
-      .range(from, to)
+      .from('zstate_file_history')
+      .select('state, region, month, total_count')
+      .returns<StateHistoryRow[]>()     // <- type for the returned rows
+      .range(from, to);
 
     if (error) {
-      console.error("Error fetching paginated history:", error)
-      break
+      console.error('Error fetching paginated history:', error);
+      break;
     }
 
-    if (!data || data.length === 0) break
+    const pageRows: StateHistoryRow[] = data ?? [];  // <- single declaration
+    allRows.push(...pageRows);
 
-    allRows.push(...data)
-
-    if (data.length < pageSize) break
-
-    from += pageSize
-    to += pageSize
+    if (pageRows.length < pageSize) break; // no more pages
+    from += pageSize;
+    to += pageSize;
   }
 
-  return allRows
-}
+  return allRows;
+};
 
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Public API used by the State Count UI
 export class DatabaseService {
-  // Fetch historical total data
-  static async getHistoricalData(): Promise<Record<string, Record<string, any>>> {
+  // Build: historicalData[month][state] = { region, total_count }
+  static async getHistoricalData(): Promise<
+    Record<string, Record<string, { region: string | null; total_count: number }>>
+  > {
     try {
-      const data = await fetchAllHistory()
+      const rows = await fetchAllHistory();
+      const historicalData: Record<
+        string,
+        Record<string, { region: string | null; total_count: number }>
+      > = {};
 
-      const historicalData: Record<string, Record<string, any>> = {}
-
-      data?.forEach((row) => {
-        const month = row.month?.trim()
-        const stateCode = row.state
-
-        if (!historicalData[month]) {
-          historicalData[month] = {}
-        }
-
-        historicalData[month][stateCode] = {
-          open: 0,
-          closed: 0,
-          withdrawn: 0,
-          total: row.total_count || 0,
-          region: row.region,
-        }
-      })
-
-      return historicalData
-    } catch (error) {
-      console.error("Database error:", error)
-      return {}
-    }
-  }
-
-  // Fetch current month data from zstate_file_current_month table
-  static async getCurrentMonthData(): Promise<Record<string, any>> {
-    try {
-      const { data, error } = await supabase
-        .from("zstate_file_current_month")
-        .select("state, region, open_count, closed_count, withdrawn_count")
-
-      if (error) {
-        console.error("Error fetching current month data:", error)
-        return {}
+      for (const row of rows) {
+        if (!historicalData[row.month]) historicalData[row.month] = {};
+        historicalData[row.month][row.state] = {
+          region: row.region ?? null,
+          total_count: row.total_count ?? 0,
+        };
       }
 
-      const currentData: Record<string, any> = {}
-
-      data?.forEach((row) => {
-        const stateCode = row.state
-
-        currentData[stateCode] = {
-          open: row.open_count || 0,
-          closed: row.closed_count || 0,
-          withdrawn: row.withdrawn_count || 0,
-          total: (row.open_count || 0) + (row.closed_count || 0) + (row.withdrawn_count || 0),
-          region: row.region,
-        }
-      })
-
-      return currentData
+      return historicalData;
     } catch (error) {
-      console.error("Database error:", error)
-      return {}
+      console.error('Database error:', error);
+      return {};
     }
   }
 
-  static calculatePercentageChange(current: number, previous: number): number {
-    if (previous === 0) return current > 0 ? 100 : 0
-    return Number.parseFloat((((current - previous) / previous) * 100).toFixed(2))
+  // Current month snapshot from zstate_file_current_month
+  static async getCurrentMonthData(): Promise<
+    Record<
+      string,
+      {
+        region: string | null;
+        open_count: number;
+        closed_count: number;
+        withdrawn_count: number;
+        total_count: number;
+      }
+    >
+  > {
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data, error } = await supabase
+  .from('zstate_file_current_month')
+  .select('state, region, open_count, closed_count, withdrawn_count')
+  .returns<StateCurrentRow[]>();  // <- each row has these fields
+
+const rows: StateCurrentRow[] = data ?? [];
+
+
+      if (error) {
+        console.error('Error fetching current month data:', error);
+        return {};
+      }
+
+      const map: Record<
+        string,
+        {
+          region: string | null;
+          open_count: number;
+          closed_count: number;
+          withdrawn_count: number;
+          total_count: number;
+        }
+      > = {};
+
+      for (const row of data ?? []) {
+        const open = row.open_count ?? 0;
+        const closed = row.closed_count ?? 0;
+        const withdrawn = row.withdrawn_count ?? 0;
+        map[row.state] = {
+          region: row.region ?? null,
+          open_count: open,
+          closed_count: closed,
+          withdrawn_count: withdrawn,
+          total_count: open + closed + withdrawn,
+        };
+      }
+
+      return map;
+    } catch (error) {
+      console.error('Database error:', error);
+      return {};
+    }
   }
 
+  // Month helpers
   static getPreviousMonth(month: string): string {
-    const date = new Date(month + "-01")
-    date.setMonth(date.getMonth() - 1)
-    return date.toISOString().slice(0, 7)
+    const date = new Date(month + '-01');
+    date.setMonth(date.getMonth() - 1);
+    return date.toISOString().slice(0, 7);
   }
 
   static getPreviousYearMonth(month: string): string {
-    const date = new Date(month + "-01")
-    date.setFullYear(date.getFullYear() - 1)
-    return date.toISOString().slice(0, 7)
+    const date = new Date(month + '-01');
+    date.setFullYear(date.getFullYear() - 1);
+    return date.toISOString().slice(0, 7);
   }
 
+  // Combined state data for a given month ("current" or "YYYY-MM") + MoM/YoY deltas
   static async getStateDataByMonth(month: string): Promise<Record<string, any>> {
     try {
-      let currentMonthData: Record<string, any> = {}
+      let currentMonthData: Record<string, any> = {};
 
-      if (month === "current") {
-        currentMonthData = await this.getCurrentMonthData()
-      } else {
-        const historicalData = await this.getHistoricalData()
-        currentMonthData = historicalData[month] || {}
+      if (month === 'current') {
+        currentMonthData = await this.getCurrentMonthData();
       }
 
-      const historicalData = await this.getHistoricalData()
+      // get historical for deltas
+      const historicalData = await this.getHistoricalData();
 
-      let previousMonthData: Record<string, any> = {}
-      let previousYearData: Record<string, any> = {}
+      let previousMonthData: Record<string, any> = {};
+      let previousYearData: Record<string, any> = {};
 
-      if (month !== "current") {
-        const previousMonth = this.getPreviousMonth(month)
-        const previousYearMonth = this.getPreviousYearMonth(month)
-        previousMonthData = historicalData[previousMonth] || {}
-        previousYearData = historicalData[previousYearMonth] || {}
+      if (month !== 'current') {
+        const previousMonth = this.getPreviousMonth(month);
+        const previousYearMonth = this.getPreviousYearMonth(month);
+        previousMonthData = historicalData[previousMonth] || {};
+        previousYearData = historicalData[previousYearMonth] || {};
       } else {
-        // Use real calendar math to compute previous month (e.g., handle Jan -> Dec)
-        const currentDate = new Date()
-
-        const previousMonthDate = new Date(currentDate)
-        previousMonthDate.setMonth(previousMonthDate.getMonth() - 1)
-        const previousMonthKey = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, "0")}`
-
-        // Use same month last year for YoY
-        const previousYearMonth = `${currentDate.getFullYear() - 1}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`
-
-        previousMonthData = historicalData[previousMonthKey] || {}
-        previousYearData = historicalData[previousYearMonth] || {}
+        // compare to real previous calendar month and same month last year
+        const now = new Date();
+        const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const prevYearDate = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+        const prevMonth = prevMonthDate.toISOString().slice(0, 7);
+        const prevYearMonth = prevYearDate.toISOString().slice(0, 7);
+        previousMonthData = historicalData[prevMonth] || {};
+        previousYearData = historicalData[prevYearMonth] || {};
       }
 
-      const transformedData: Record<string, any> = {}
+      const result: Record<string, any> = {};
 
-      Object.keys(currentMonthData).forEach((stateCode) => {
-        const current = currentMonthData[stateCode]
-        const previous = previousMonthData[stateCode]
-        const previousYear = previousYearData[stateCode]
-
-        transformedData[stateCode] = {
-          open: current.open,
-          closed: current.closed,
-          withdrawn: current.withdrawn,
-          total: current.total,
-          region: current.region,
-          openChange: previous ? this.calculatePercentageChange(current.open, previous.open) : 0,
-          closedChange: previous ? this.calculatePercentageChange(current.closed, previous.closed) : 0,
-          withdrawnChange: previous ? this.calculatePercentageChange(current.withdrawn, previous.withdrawn) : 0,
-          totalChange: previous ? this.calculatePercentageChange(current.total, previous.total) : 0,
-          previousMonthChange: previous ? this.calculatePercentageChange(current.total, previous.total) : null,
-          yearOverYearChange: previousYear ? this.calculatePercentageChange(current.total, previousYear.total) : null,
+      if (month === 'current') {
+        // use live counts
+        for (const [state, val] of Object.entries(currentMonthData)) {
+          const pm = previousMonthData[state]?.total_count ?? 0;
+          const py = previousYearData[state]?.total_count ?? 0;
+          result[state] = {
+            state,
+            region: val.region ?? null,
+            open_count: val.open_count,
+            closed_count: val.closed_count,
+            withdrawn_count: val.withdrawn_count,
+            total_count: val.total_count,
+            delta_mom: val.total_count - pm,
+            delta_yoy: val.total_count - py,
+          };
         }
-      })
+      } else {
+        // use historical snapshot for requested month
+        const snapshot: Record<string, { region: string | null; total_count: number }> =
+          historicalData[month] || {};
+        for (const state of Object.keys(snapshot)) {
+          const val = snapshot[state];
+          const pm = previousMonthData[state]?.total_count ?? 0;
+          const py = previousYearData[state]?.total_count ?? 0;
+          result[state] = {
+            state,
+            region: val.region ?? null,
+            total_count: val.total_count ?? 0,
+            delta_mom: (val.total_count ?? 0) - pm,
+            delta_yoy: (val.total_count ?? 0) - py,
+          };
+        }
+      }
 
-      return transformedData
+      return result;
     } catch (error) {
-      console.error("Database error:", error)
-      return {}
+      console.error('Database error:', error);
+      return {};
     }
   }
 
-  static async getStateDataByMonthAndRegion(month: string, region?: string): Promise<Record<string, any>> {
-    const allData = await this.getStateDataByMonth(month)
+  static async getStateDataByMonthAndRegion(
+    month: string,
+    region?: string,
+  ): Promise<Record<string, any>> {
+    const allData = await this.getStateDataByMonth(month);
 
-    if (!region || region === "all") {
-      return allData
+    if (!region || region === 'all') {
+      return allData;
     }
 
-    const filteredData: Record<string, any> = {}
-    Object.keys(allData).forEach((stateCode) => {
+    const filtered: Record<string, any> = {};
+    for (const stateCode of Object.keys(allData)) {
       if (allData[stateCode].region === region) {
-        filteredData[stateCode] = allData[stateCode]
+        filtered[stateCode] = allData[stateCode];
       }
-    })
-
-    return filteredData
-  }
-
-  static async getAvailableMonths(): Promise<Array<{ value: string; label: string }>> {
-    try {
-      const months = [{ value: "current", label: "Current Month" }]
-
-      const { data, error } = await supabase
-        .from("zstate_file_history")
-        .select("month")
-        .order("month", { ascending: false })
-
-      if (error) {
-        console.error("Error fetching months:", error)
-        return months
-      }
-
-      const uniqueMonths = [...new Set(data?.map((row) => row.month) || [])]
-
-      const monthNames = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-      ]
-
-      uniqueMonths.forEach((month) => {
-        const [year, monthNum] = month.split("-")
-        const monthIndex = Number.parseInt(monthNum, 10) - 1
-        const label = `${monthNames[monthIndex]} ${year}`
-
-        months.push({
-          value: month,
-          label,
-        })
-      })
-
-      return months
-    } catch (error) {
-      console.error("Database error:", error)
-      return [{ value: "current", label: "Current Month" }]
     }
+
+    return filtered;
   }
 
-  static async getRegions(): Promise<string[]> {
+  // Distinct months (history) + "current" first
+  static async getAvailableMonths(): Promise<Option[]> {
     try {
-      const [current, history] = await Promise.all([
-        supabase.from("zstate_file_current_month").select("region"),
-        supabase.from("zstate_file_history").select("region"),
-      ])
-
-      const regions = new Set<string>()
-      current.data?.forEach((row) => {
-        if (row.region) regions.add(row.region)
-      })
-      history.data?.forEach((row) => {
-        if (row.region) regions.add(row.region)
-      })
-
-      return Array.from(regions).sort()
-    } catch (error) {
-      console.error("Database error:", error)
-      return []
+      const supabase = getSupabaseBrowserClient(); // ← make the client
+  
+      const { data, error } = await supabase
+        .from('zstate_file_history')
+        .select('month')
+        .returns<{ month: string }[]>();           // ← type the returned rows
+  
+      if (error) {
+        console.error('Error fetching months:', error);
+        return [{ value: 'current', label: 'Current' }];
+      }
+  
+      // unique months as strings
+      const monthsArr: string[] = (data ?? []).map((r: { month: string }) => r.month);
+      const unique: string[] = Array.from(new Set<string>(monthsArr)).sort();
+  
+      const opts: Option[] = [
+        { value: 'current', label: 'Current' },
+        ...unique.map((m: string) => ({ value: m, label: labelMonth(m) })),
+      ];
+  
+      return opts;
+    } catch (err) {
+      console.error('Database error:', err);
+      return [{ value: 'current', label: 'Current' }];
     }
   }
 }
+  
