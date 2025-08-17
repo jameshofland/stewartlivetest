@@ -27,6 +27,7 @@ interface Transaction {
   lead_notes: string
   lead_name: string
   last_updated: string
+  gci: number | null            // ← NEW
 }
 
 interface UnmatchedTransaction {
@@ -91,6 +92,11 @@ export default function TransactionDashboard() {
   const [unmatchedLoading, setUnmatchedLoading] = useState(false)
   const [unmatchedSearchTerm, setUnmatchedSearchTerm] = useState("")
 
+  const [summary, setSummary] = useState<{
+    transactions_remaining: number
+    amount_remaining: number
+  } | null>(null)
+
   const rowsPerPage = 50
 
   // Summary metrics
@@ -106,7 +112,20 @@ export default function TransactionDashboard() {
     fetchUser()
     fetchTransactions(1)
     fetchFilterOptions()
+    fetchSummary()
   }, [])
+
+  const fetchSummary = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('v_reconciliation_summary')
+        .select('*')
+        .single()
+      if (!error && data) setSummary(data)
+    } catch (e) {
+      console.error('Error fetching summary:', e)
+    }
+  }  
 
   useEffect(() => {
     if (activeTab === "unmatched" && unmatchedTransactions.length === 0) {
@@ -340,26 +359,30 @@ export default function TransactionDashboard() {
   }, [unmatchedSearchTerm, activeTab])
 
   const updateTransaction = async (id: string, field: string, value: string) => {
-    try {
-      const { error } = await supabase
-        .from("transactions")
-        .update({
-          [field]: value,
-          last_updated: new Date().toISOString(),
-        })
-        .eq("id", id)
+  try {
+    const { error } = await supabase
+      .from("transactions")
+      .update({
+        [field]: value,
+        last_updated: new Date().toISOString(),
+      })
+      .eq("id", id)
 
-      if (!error) {
-        setTransactions((prev) =>
-          prev.map((t) => (t.id === id ? { ...t, [field]: value, last_updated: new Date().toISOString() } : t)),
-        )
-      } else {
-        console.error("Error updating transaction:", error)
-      }
-    } catch (error) {
+    if (!error) {
+      setTransactions((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, [field]: value, last_updated: new Date().toISOString() } : t
+        ),
+      )
+      // 👇 Add this line to refresh the top counters after an update
+      fetchSummary()
+    } else {
       console.error("Error updating transaction:", error)
     }
+  } catch (error) {
+    console.error("Error updating transaction:", error)
   }
+}
 
   const updateUnmatchedTransaction = async (id: string, assignedTa: string) => {
     try {
@@ -379,6 +402,12 @@ export default function TransactionDashboard() {
     const date = new Date(timestamp)
     const now = new Date()
     const isToday = date.toDateString() === now.toDateString()
+
+    const fmtMoney = (n?: number | string | null) =>
+      n === null || n === undefined || n === ''
+        ? '—'
+        : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
+            .format(typeof n === 'number' ? n : Number(n))
 
     if (isToday) {
       return `Today at ${date.toLocaleTimeString("en-US", {
@@ -443,13 +472,14 @@ export default function TransactionDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Summary Cards - Only show for matched transactions */}
         {activeTab === "matched" && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Open Files</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalOpenFiles}</div>
+              <div className="text-2xl font-bold">
+                 {summary?.transactions_remaining ?? totalOpenFiles}</div>
               </CardContent>
             </Card>
 
@@ -472,6 +502,18 @@ export default function TransactionDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">{recentlyResolved}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  $ Remaining
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {fmtMoney(summary?.amount_remaining ?? 0)}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -566,6 +608,7 @@ export default function TransactionDashboard() {
                               <TableRow>
                                 <TableHead>TA Name</TableHead>
                                 <TableHead>TRX ID</TableHead>
+                                <TableHead>GCI</TableHead>  
                                 <TableHead>Property Address</TableHead>
                                 <TableHead>Agent Name</TableHead>
                                 <TableHead>Office Name</TableHead>
@@ -580,6 +623,9 @@ export default function TransactionDashboard() {
                                 <TableRow key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                   <TableCell className="font-medium">{transaction.ta_name}</TableCell>
                                   <TableCell>{transaction.trx_id}</TableCell>
+                                  <TableCell className="text-right tabular-nums">
+                                    {fmtMoney(transaction.gci)}
+                                    </TableCell>
                                   <TableCell>{transaction.property_address}</TableCell>
                                   <TableCell>{transaction.agent_name}</TableCell>
                                   <TableCell>{transaction.office_name}</TableCell>
