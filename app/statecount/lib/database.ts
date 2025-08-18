@@ -1,4 +1,5 @@
 'use client';
+
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -28,7 +29,8 @@ const labelMonth = (yyyyMm: string): string => {
   return `${MONTHS[mi]} ${y}`;
 };
 
-// Fetch all history with pagination (typed)
+// ───────────────────────────────────────────────────────────────────────────────
+// Internal: fetch all history with pagination (typed)
 export const fetchAllHistory = async (): Promise<StateHistoryRow[]> => {
   const supabase = getSupabaseBrowserClient();
   const pageSize = 1000;
@@ -40,7 +42,7 @@ export const fetchAllHistory = async (): Promise<StateHistoryRow[]> => {
     const { data, error } = await supabase
       .from('zstate_file_history')
       .select('state, region, month, total_count')
-      .returns<StateHistoryRow[]>()     // <- type for the returned rows
+      .returns<StateHistoryRow[]>()     // type for returned rows
       .range(from, to);
 
     if (error) {
@@ -48,7 +50,7 @@ export const fetchAllHistory = async (): Promise<StateHistoryRow[]> => {
       break;
     }
 
-    const pageRows: StateHistoryRow[] = data ?? [];  // <- single declaration
+    const pageRows: StateHistoryRow[] = data ?? [];
     allRows.push(...pageRows);
 
     if (pageRows.length < pageSize) break; // no more pages
@@ -58,7 +60,6 @@ export const fetchAllHistory = async (): Promise<StateHistoryRow[]> => {
 
   return allRows;
 };
-
 
 // ───────────────────────────────────────────────────────────────────────────────
 // Public API used by the State Count UI
@@ -105,12 +106,9 @@ export class DatabaseService {
     try {
       const supabase = getSupabaseBrowserClient();
       const { data, error } = await supabase
-  .from('zstate_file_current_month')
-  .select('state, region, open_count, closed_count, withdrawn_count')
-  .returns<StateCurrentRow[]>();  // <- each row has these fields
-
-const rows: StateCurrentRow[] = data ?? [];
-
+        .from('zstate_file_current_month')
+        .select('state, region, open_count, closed_count, withdrawn_count')
+        .returns<StateCurrentRow[]>();
 
       if (error) {
         console.error('Error fetching current month data:', error);
@@ -258,32 +256,113 @@ const rows: StateCurrentRow[] = data ?? [];
   // Distinct months (history) + "current" first
   static async getAvailableMonths(): Promise<Option[]> {
     try {
-      const supabase = getSupabaseBrowserClient(); // ← make the client
-  
+      const supabase = getSupabaseBrowserClient();
+
       const { data, error } = await supabase
         .from('zstate_file_history')
         .select('month')
-        .returns<{ month: string }[]>();           // ← type the returned rows
-  
+        .returns<{ month: string }[]>();
+
       if (error) {
         console.error('Error fetching months:', error);
         return [{ value: 'current', label: 'Current' }];
       }
-  
-      // unique months as strings
-      const monthsArr: string[] = (data ?? []).map((r: { month: string }) => r.month);
+
+      const monthsArr: string[] = (data ?? []).map((r) => r.month);
       const unique: string[] = Array.from(new Set<string>(monthsArr)).sort();
-  
+
       const opts: Option[] = [
         { value: 'current', label: 'Current' },
         ...unique.map((m: string) => ({ value: m, label: labelMonth(m) })),
       ];
-  
+
       return opts;
     } catch (err) {
       console.error('Database error:', err);
       return [{ value: 'current', label: 'Current' }];
     }
   }
+
+  static async getAvailableStates(month: string): Promise<string[]> {
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      if (month === 'current') {
+        const { data, error } = await supabase
+          .from('zstate_file_current_month')
+          .select('state')
+          .returns<{ state: string }[]>();
+
+        if (error) {
+          console.error('Error fetching current states:', error);
+          return [];
+        }
+        const states: string[] = (data ?? []).map((r) => r.state);
+        return Array.from(new Set<string>(states)).sort();
+      } else {
+        const { data, error } = await supabase
+          .from('zstate_file_history')
+          .select('state, month')
+          .eq('month', month)
+          .returns<Array<{ state: string; month: string }>>();
+
+        if (error) {
+          console.error('Error fetching history states:', error);
+          return [];
+        }
+        const states: string[] = (data ?? []).map((r) => r.state);
+        return Array.from(new Set<string>(states)).sort();
+      }
+    } catch (error) {
+      console.error('Database error:', error);
+      return [];
+    }
+  }
+
+  static async getAvailableRegions(): Promise<string[]> {
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { data: cur } = await supabase
+        .from('zstate_file_current_month')
+        .select('region')
+        .returns<{ region: string | null }[]>();
+
+      const { data: hist } = await supabase
+        .from('zstate_file_history')
+        .select('region')
+        .returns<{ region: string | null }[]>();
+
+      const regions = new Set<string>();
+      (cur ?? []).forEach((r) => { if (r.region) regions.add(r.region); });
+      (hist ?? []).forEach((r) => { if (r.region) regions.add(r.region); });
+
+      return Array.from(regions).sort();
+    } catch (error) {
+      console.error('Database error:', error);
+      return [];
+    }
+  }
+
+  // --- Back-compat aliases used by older UI code ---
+  static async getRegions(): Promise<string[]> {
+    return this.getAvailableRegions();
+  }
+  static async getMonths(): Promise<Option[]> {
+    return this.getAvailableMonths();
+  }
+  static async getStates(month: string): Promise<string[]> {
+    return this.getAvailableStates(month);
+  }
+  static async getDataByMonth(month: string): Promise<Record<string, any>> {
+    return this.getStateDataByMonth(month);
+  }
+  static async getDataByMonthAndRegion(
+    month: string,
+    region?: string,
+  ): Promise<Record<string, any>> {
+    return this.getStateDataByMonthAndRegion(month, region);
+  }
 }
-  
+
+export default DatabaseService;
