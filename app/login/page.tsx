@@ -1,58 +1,57 @@
 "use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase";
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import Image from 'next/image'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, Chrome } from 'lucide-react'
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Chrome } from "lucide-react";
 
 export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
   const supabase = getSupabaseBrowserClient();
 
+  // If a user session already exists, skip the login screen.
   useEffect(() => {
-    // Check if user is already logged in
     const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        router.push('/home')
-      }
-    }
-    checkUser()
-  }, [router, supabase.auth])
-console.log("🟢 Button clicked");
-  const handleGoogleLogin = async () => {
-  try {
-    setIsLoading(true)
-    setError(null)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) router.push("/home");
+    };
+    checkUser();
+  }, [router, supabase.auth]);
 
-    const { data, error: authError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          access_type: 'offline',     // 🔁 Ensures refresh token is included
-          prompt: 'consent',          // 🔁 Forces consent screen (for refresh)
-          hd: 'exprealty.net',        // 🔐 Restricts email domain (Google-side)
+  const handleGoogleLogin = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Use PKCE + explicit callback so we get ?code=... (not #access_token)
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          flowType: "pkce",
+          queryParams: {
+            access_type: "offline", // request refresh token
+            prompt: "consent",
+            hd: "exprealty.net",    // restrict Google accounts by domain
+          },
         },
-      },
-    })
+      });
 
-    if (authError) {
-      throw authError
+      if (authError) throw authError;
+      // Redirect happens automatically; nothing else to do here.
+    } catch (err: any) {
+      console.error("Login error:", err);
+      setError(err?.message || "An error occurred during login");
+    } finally {
+      setIsLoading(false);
     }
-  } catch (err: any) {
-    console.error('Login error:', err)
-    setError(err.message || 'An error occurred during login')
-  } finally {
-    setIsLoading(false)
-  }
-}
+  }, [supabase]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex">
@@ -76,7 +75,7 @@ console.log("🟢 Button clicked");
                 className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center space-x-3"
               >
                 {isLoading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
                 ) : (
                   <>
                     <Chrome className="h-5 w-5" />
@@ -89,10 +88,9 @@ console.log("🟢 Button clicked");
                 <Alert className="border-red-200 bg-red-50">
                   <AlertCircle className="h-4 w-4 text-red-600" />
                   <AlertDescription className="text-red-700">
-                    {error.includes('domain') || error.includes('unauthorized') 
-                      ? 'Please use your @exprealty.net email address to log in.'
-                      : error
-                    }
+                    {error.includes("domain") || error.includes("unauthorized")
+                      ? "Please use your @exprealty.net email address to log in."
+                      : error}
                   </AlertDescription>
                 </Alert>
               )}
@@ -120,13 +118,13 @@ console.log("🟢 Button clicked");
               priority
             />
           </div>
-          
-          {/* Floating elements for tech-forward feel */}
-          <div className="absolute -top-4 -right-4 w-8 h-8 bg-blue-500 rounded-full opacity-60 animate-bounce"></div>
-          <div className="absolute -bottom-6 -left-6 w-6 h-6 bg-blue-400 rounded-full opacity-40 animate-bounce delay-300"></div>
-          <div className="absolute top-1/2 -left-8 w-4 h-4 bg-blue-300 rounded-full opacity-50 animate-bounce delay-700"></div>
+
+          {/* Floating accents */}
+          <div className="absolute -top-4 -right-4 w-8 h-8 bg-blue-500 rounded-full opacity-60 animate-bounce" />
+          <div className="absolute -bottom-6 -left-6 w-6 h-6 bg-blue-400 rounded-full opacity-40 animate-bounce delay-300" />
+          <div className="absolute top-1/2 -left-8 w-4 h-4 bg-blue-300 rounded-full opacity-50 animate-bounce delay-700" />
         </div>
       </div>
     </div>
-  )
+  );
 }
