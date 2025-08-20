@@ -5,7 +5,7 @@ import { createServerClient } from "@supabase/ssr";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const next = url.searchParams.get("next") || "/reconciliation";
+  const next = url.searchParams.get("next") || "/home";
   const code = url.searchParams.get("code");
 
   const cookieStore = cookies();

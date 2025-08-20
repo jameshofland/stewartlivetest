@@ -24,7 +24,7 @@ useEffect(() => {
 
   // Also handle the case where a session already exists on first load
   supabase.auth.getSession().then(({ data }) => {
-    if (data.session) router.replace("/reconciliation");
+    if (data.session) router.replace("/home");
   });
 
   return () => { try { sub.subscription.unsubscribe(); } catch {} };
