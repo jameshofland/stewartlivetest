@@ -15,43 +15,48 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
 
-  // If a user session already exists, skip the login screen.
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) router.push("/home");
-    };
-    checkUser();
-  }, [router, supabase.auth]);
+  // Redirect to the app as soon as we have a session.
+// Works for both PKCE (?code=...) and implicit (#access_token) flows.
+useEffect(() => {
+  const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (session) router.replace("/reconciliation");
+  });
 
-  const handleGoogleLogin = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  // Also handle the case where a session already exists on first load
+  supabase.auth.getSession().then(({ data }) => {
+    if (data.session) router.replace("/reconciliation");
+  });
 
-      // Use PKCE + explicit callback so we get ?code=... (not #access_token)
-      const { error: authError } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          flowType: "pkce",
-          queryParams: {
-            access_type: "offline", // request refresh token
-            prompt: "consent",
-            hd: "exprealty.net",    // restrict Google accounts by domain
-          },
+  return () => { try { sub.subscription.unsubscribe(); } catch {} };
+}, [router, supabase]);
+  
+const handleGoogleLogin = useCallback(async () => {
+  try {
+    setIsLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        // Return to the same page; the session-listener will bounce to /reconciliation
+        redirectTo: window.location.href,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+          hd: "exprealty.net",
         },
-      });
+      },
+    });
 
-      if (authError) throw authError;
-      // Redirect happens automatically; nothing else to do here.
-    } catch (err: any) {
-      console.error("Login error:", err);
-      setError(err?.message || "An error occurred during login");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [supabase]);
+    if (error) throw error;
+  } catch (err: any) {
+    console.error("Login error:", err);
+    setError(err?.message ?? "An error occurred during login");
+  } finally {
+    setIsLoading(false);
+  }
+}, [supabase]);
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex">
