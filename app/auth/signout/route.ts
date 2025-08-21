@@ -1,8 +1,8 @@
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
-export default async function RootPage() {
+export async function GET() {
   const cookieStore = cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,6 +17,6 @@ export default async function RootPage() {
     }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
-  redirect(session ? "/home" : "/login");
+  await supabase.auth.signOut();
+  return NextResponse.redirect(new URL("/login", "https://project-stewart.com"));
 }

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
-export default async function RootPage() {
+export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,5 +18,7 @@ export default async function RootPage() {
   );
 
   const { data: { session } } = await supabase.auth.getSession();
-  redirect(session ? "/home" : "/login");
+  if (!session) redirect("/login");
+
+  return <>{children}</>;
 }

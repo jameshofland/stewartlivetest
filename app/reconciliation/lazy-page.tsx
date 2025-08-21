@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic"
 import { LoadingFallback } from "@/components/loading-fallback"
 
-const TransactionDashboard = dynamic(() => import("./page"), {
+const TransactionDashboard = dynamic(() => import("../(protected)/reconciliation/page"), {
   loading: () => (
     <LoadingFallback
       title="Loading Reconciliation Dashboard"
