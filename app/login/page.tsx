@@ -16,47 +16,61 @@ export default function LoginPage() {
   const supabase = getSupabaseBrowserClient();
 
   // Redirect to the app as soon as we have a session.
-// Works for both PKCE (?code=...) and implicit (#access_token) flows.
-useEffect(() => {
-  const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-    if (session) router.replace("/reconciliation");
-  });
-
-  // Also handle the case where a session already exists on first load
-  supabase.auth.getSession().then(({ data }) => {
-    if (data.session) router.replace("/home");
-  });
-
-  return () => { try { sub.subscription.unsubscribe(); } catch {} };
-}, [router, supabase]);
-  
-const handleGoogleLogin = useCallback(async () => {
-  try {
-    setIsLoading(true);
-    setError(null);
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        // Return to the same page; the session-listener will bounce to /reconciliation
-        redirectTo: window.location.href,
-        queryParams: {
-          access_type: "offline",
-          prompt: "consent",
-          hd: "exprealty.net",
-        },
-      },
+  // Works for PKCE (?code=...) or when a session already exists.
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) router.replace("/home"); // ← unified to /home
     });
 
-    if (error) throw error;
-  } catch (err: any) {
-    console.error("Login error:", err);
-    setError(err?.message ?? "An error occurred during login");
-  } finally {
-    setIsLoading(false);
-  }
-}, [supabase]);
-  
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) router.replace("/home"); // ← unified to /home
+    });
+
+    return () => {
+      try {
+        sub.subscription.unsubscribe();
+      } catch {}
+    };
+  }, [router, supabase]);
+
+  const handleGoogleLogin = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Compute callback + preserve ?next= from /login?next=...
+      const origin =
+        typeof window !== "undefined"
+          ? window.location.origin
+          : "https://project-stewart.com";
+      const params = new URLSearchParams(
+        typeof window !== "undefined" ? window.location.search : ""
+      );
+      const next = params.get("next") ?? "/home";
+      const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(
+        next
+      )}`;
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo, // ← force our server callback (sets HttpOnly cookies)
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+            hd: "exprealty.net",
+          },
+        },
+      });
+
+      if (error) throw error;
+    } catch (err: any) {
+      console.error("Login error:", err);
+      setError(err?.message ?? "An error occurred during login");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [supabase]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex">
