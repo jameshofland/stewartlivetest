@@ -10,6 +10,7 @@ type SupabaseCookieAdapter = {
 };
 
 export async function middleware(req: NextRequest) {
+  // Create a response that Supabase can attach Set-Cookie to
   const res = NextResponse.next();
 
   const cookiesAdapter: SupabaseCookieAdapter = {
@@ -44,20 +45,24 @@ export async function middleware(req: NextRequest) {
     path.startsWith("/static/") ||
     /\.(png|jpg|jpeg|svg|gif|ico|css|js|map|txt)$/i.test(path);
 
+  // Allow static + auth routes
   if (isStatic || isAuthRoute) {
     if (session && path === "/login") {
       const url = req.nextUrl.clone();
       url.pathname = "/home";
-      return NextResponse.redirect(url);
+      // IMPORTANT: forward cookies on redirect
+      return NextResponse.redirect(url, { headers: res.headers });
     }
     return res;
   }
 
+  // Everything else requires a session
   if (!session) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path + req.nextUrl.search);
-    return NextResponse.redirect(url);
+    // IMPORTANT: forward cookies on redirect
+    return NextResponse.redirect(url, { headers: res.headers });
   }
 
   return res;

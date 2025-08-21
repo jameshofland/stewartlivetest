@@ -9,7 +9,11 @@ type SupabaseCookieAdapter = {
   remove(name: string, options: CookieOptions): void;
 };
 
-export async function GET() {
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  // allow ?next=/somewhere (optional)
+  const next = url.searchParams.get("next") || "/login";
+
   const cookieStore = cookies();
 
   const cookiesAdapter: SupabaseCookieAdapter = {
@@ -31,5 +35,7 @@ export async function GET() {
   );
 
   await supabase.auth.signOut();
-  return NextResponse.redirect(new URL("/login", "https://project-stewart.com"));
+
+  // after clearing cookies, send them to login (or ?next)
+  return NextResponse.redirect(new URL(next, url.origin));
 }
