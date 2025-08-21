@@ -32,12 +32,12 @@ export async function GET(req: Request) {
     return NextResponse.redirect(dest);
   }
 
-  // Optional: bubble what came back if code is missing (handy for debugging)
-  // return NextResponse.redirect(
-  //   new URL(`/login?error=NoCode&qs=${encodeURIComponent(url.search)}`, url.origin)
-  // );
-
+  // ---- DEBUG: show EXACT query-string we received ----
+  // Examples you may see:
+  //   ?error=access_denied&error_description=...        (Google rejected)
+  //   ?state=...                                        (implicit flow or intermediate redirect)
+  const qs = url.search; // includes leading '?'
   return NextResponse.redirect(
-    new URL("/login?error=Authentication%20failed", url.origin)
+    new URL(`/login?error=NoCode&qs=${encodeURIComponent(qs)}`, url.origin)
   );
 }
