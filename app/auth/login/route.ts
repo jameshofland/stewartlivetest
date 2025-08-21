@@ -7,28 +7,23 @@ export async function GET(req: Request) {
   const next = url.searchParams.get("next") || "/home";
 
   const jar = cookies();
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string): string | undefined {
-          return jar.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions): void {
+        get(name: string) { return jar.get(name)?.value; },
+        set(name: string, value: string, options: CookieOptions) {
           jar.set({ name, value, ...options });
         },
-        remove(name: string, options: CookieOptions): void {
+        remove(name: string, options: CookieOptions) {
           jar.set({ name, value: "", ...options, expires: new Date(0) });
         },
       },
     }
   );
 
-  const redirectTo = `${url.origin}/auth/callback?next=${encodeURIComponent(
-    next
-  )}`;
+  const redirectTo = `${url.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -45,10 +40,7 @@ export async function GET(req: Request) {
 
   if (error || !data?.url) {
     const msg = error?.message ?? "NoAuthURL";
-    return NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent(msg)}`, url.origin)
-    );
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(msg)}`, url.origin));
   }
-
   return NextResponse.redirect(data.url);
 }

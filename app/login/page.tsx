@@ -1,74 +1,66 @@
 "use client";
 
-import { getSupabaseBrowserClient } from "@/lib/supabase";
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Chrome } from "lucide-react";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
 
-  // If a session exists (or appears), go to /home
+  // if already logged in, go home
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const sub = supabase.auth.onAuthStateChange((_evt, session) => {
       if (session) router.replace("/home");
     });
-
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) router.replace("/home");
     });
-
-    return () => {
-      try {
-        sub.subscription.unsubscribe();
-      } catch {}
-    };
+    return () => sub.data?.subscription?.unsubscribe();
   }, [router, supabase]);
 
-  const handleGoogleLogin = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  // compute ?next= for this page
+  const loginHref = useMemo(() => {
+    if (typeof window === "undefined") return "/auth/login?next=/home";
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next") ?? "/home";
+    return `/auth/login?next=${encodeURIComponent(next)}`;
+  }, []);
 
-      const origin =
-        typeof window !== "undefined"
-          ? window.location.origin
-          : "https://project-stewart.com";
+  return (
+    <main className="grid min-h-dvh place-items-center p-4">
+      <Card className="w-full max-w-md">
+        <CardContent className="space-y-6 p-6">
+          <div className="flex items-center gap-3">
+            <Image src="/stewart.png" width={40} height={40} alt="" />
+            <h1 className="text-xl font-semibold">Project Stewart</h1>
+          </div>
 
-      const params = new URLSearchParams(
-        typeof window !== "undefined" ? window.location.search : ""
-      );
-      const next = params.get("next") ?? "/home";
-      const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo,               // our server callback (sets HttpOnly cookies)
-          flowType: "pkce",         // <-- force PKCE so /auth/callback gets ?code=...
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-            hd: "exprealty.net",
-          },
-        } as any, // hush older typings
-      });
-
-      if (error) throw error;
-    } catch (err: any) {
-      console.error("Login error:", err);
-      setError(err?.message ?? "An error occurred during login");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [supabase]);
+          <Button asChild className="w-full">
+            {/* HARD redirect to our server starter */}
+            <a href={loginHref}>
+              <Chrome className="mr-2 h-4 w-4" />
+              Continue with Google
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex">
