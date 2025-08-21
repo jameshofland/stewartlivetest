@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,7 +62,7 @@ type ReconciliationClientProps = {
 };
 
 export default function TransactionDashboard({ initialSummary, initialMatched, initialUnmatched }: ReconciliationClientProps) {
-  const [user, setUser] = useState<User | null>(initialSummary)
+  const [user, setUser] = useState<User | null>(null)
   const [darkMode, setDarkMode] = useState(false)
   const [colorblindMode, setColorblindMode] = useState(false)
   const [activeTab, setActiveTab] = useState("matched")
@@ -115,11 +115,20 @@ export default function TransactionDashboard({ initialSummary, initialMatched, i
   ).length
 
   useEffect(() => {
-    fetchUser()
-    fetchTransactions(1)
-    fetchFilterOptions()
-    fetchSummary()
-  }, [])
+        // Ensure cookie → JWT hydration happens before we hit PostgREST
+        supabase.auth.getSession()
+          .then(() => {
+            fetchUser()
+            fetchTransactions(1)
+            fetchFilterOptions()
+            fetchSummary()
+          })
+          .catch(() => {
+            // Still load non-sensitive bits if hydration fails
+            fetchFilterOptions()
+            fetchSummary()
+          })
+      }, [])
 
   const fetchSummary = async () => {
     try {

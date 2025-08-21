@@ -1,20 +1,23 @@
-import { createServerClient as createSupabaseServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { NextRequest, NextResponse } from 'next/server'
+import "server-only";
+import { cookies } from "next/headers";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-export function createServerClient(_ctx?: { request?: NextRequest; response?: NextResponse }) {
-  const cookieStore = cookies()
-  return createSupabaseServerClient(
+export function getSupabaseServerClient(): SupabaseClient {
+  const jar = cookies();
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet) {
-          try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) }
-          catch {}
+        get(name: string) { return jar.get(name)?.value; },
+        set(name: string, value: string, options: CookieOptions) {
+          jar.set({ name, value, ...options });
+        },
+        remove(name: string, options: CookieOptions) {
+          jar.set({ name, value: "", ...options, expires: new Date(0) });
         },
       },
     }
-  )
+  );
 }

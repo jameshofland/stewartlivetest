@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 import ReconciliationClient from "./ReconciliationClient";
 
 export default async function ReconciliationPage() {

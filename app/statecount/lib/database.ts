@@ -1,6 +1,6 @@
 'use client';
 
-import { getSupabaseBrowserClient } from '@/lib/supabase';
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 // ───────────────────────────────────────────────────────────────────────────────
 // Row types
