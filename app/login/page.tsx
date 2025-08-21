@@ -34,12 +34,26 @@ export default function LoginPage() {
   }, []);
 
   return (
-    <main className="grid min-h-dvh place-items-center p-4">
-      <Card className="w-full max-w-md">
-        <CardContent className="space-y-6 p-6">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-8">
+      <div className="absolute inset-0 pointer-events-none [background-image:radial-gradient(20rem_20rem_at_10%_10%,rgba(99,102,241,0.15),transparent),radial-gradient(18rem_18rem_at_90%_20%,rgba(56,189,248,0.12),transparent),radial-gradient(22rem_22rem_at_20%_90%,rgba(34,197,94,0.10),transparent)]" />
+      <Card className="relative w-full max-w-md border-0 shadow-xl backdrop-blur-sm">
+        <CardContent className="p-8 space-y-7">
           <div className="flex items-center gap-3">
-            <Image src="/stewart.png" width={40} height={40} alt="" />
-            <h1 className="text-xl font-semibold">Project Stewart</h1>
+            <Image
+              src="/stewart.png" // make sure this exists in /public
+              width={40}
+              height={40}
+              alt="Stewart"
+              className="rounded-xl"
+            />
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Project Stewart</h1>
+              <p className="text-sm text-slate-500">Operational intelligence for eXp</p>
+            </div>
+          </div>
+
+          <div className="text-slate-600 leading-relaxed">
+            <p>Log in with your <span className="font-medium">@exprealty.net</span> account to access dashboards.</p>
           </div>
 
           {error && (
@@ -49,91 +63,22 @@ export default function LoginPage() {
             </Alert>
           )}
 
-          <Button asChild className="w-full">
-            {/* HARD redirect to our server starter */}
+          <Button
+            asChild
+            className="w-full h-11 text-base rounded-2xl shadow-lg hover:shadow-xl transition-shadow"
+          >
+            {/* HARD redirect to our server starter (PKCE) */}
             <a href={loginHref}>
               <Chrome className="mr-2 h-4 w-4" />
               Continue with Google
             </a>
           </Button>
+
+          <p className="text-xs text-center text-slate-500">
+            SSO restricted to <span className="font-medium">exprealty.net</span> • Secure PKCE + HttpOnly cookies
+          </p>
         </CardContent>
       </Card>
     </main>
-  );
-}
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex">
-      {/* Left Side - Login Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-          <CardContent className="p-8">
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-slate-900 mb-3">
-                Welcome to Project Stewart
-              </h1>
-              <p className="text-slate-600 text-lg leading-relaxed">
-                Log in with your @exprealty.net account to access dashboards.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <Button
-                onClick={handleGoogleLogin}
-                disabled={isLoading}
-                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center space-x-3"
-              >
-                {isLoading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
-                ) : (
-                  <>
-                    <Chrome className="h-5 w-5" />
-                    <span>Continue with Google</span>
-                  </>
-                )}
-              </Button>
-
-              {error && (
-                <Alert className="border-red-200 bg-red-50">
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-700">
-                    {error.includes("domain") || error.includes("unauthorized")
-                      ? "Please use your @exprealty.net email address to log in."
-                      : error}
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-
-            <div className="mt-8 text-center">
-              <p className="text-sm text-slate-500">
-                Only @exprealty.net accounts are authorized
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Right Side - Stewart Robot Illustration */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-gradient-to-bl from-blue-100 to-slate-100">
-        <div className="relative">
-          <div className="w-96 h-96 bg-white rounded-full shadow-2xl flex items-center justify-center">
-            <Image
-              src="/images/stewart.png"
-              alt="Stewart Robot"
-              width={300}
-              height={300}
-              className="object-contain animate-pulse"
-              priority
-            />
-          </div>
-
-          {/* Floating accents */}
-          <div className="absolute -top-4 -right-4 w-8 h-8 bg-blue-500 rounded-full opacity-60 animate-bounce" />
-          <div className="absolute -bottom-6 -left-6 w-6 h-6 bg-blue-400 rounded-full opacity-40 animate-bounce delay-300" />
-          <div className="absolute top-1/2 -left-8 w-4 h-4 bg-blue-300 rounded-full opacity-50 animate-bounce delay-700" />
-        </div>
-      </div>
-    </div>
   );
 }
