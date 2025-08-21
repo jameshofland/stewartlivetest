@@ -15,15 +15,14 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
 
-  // Redirect to the app as soon as we have a session.
-  // Works for PKCE (?code=...) or when a session already exists.
+  // If a session exists (or appears), go to /home
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) router.replace("/home"); // ← unified to /home
+      if (session) router.replace("/home");
     });
 
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace("/home"); // ← unified to /home
+      if (data.session) router.replace("/home");
     });
 
     return () => {
@@ -38,29 +37,28 @@ export default function LoginPage() {
       setIsLoading(true);
       setError(null);
 
-      // Compute callback + preserve ?next= from /login?next=...
       const origin =
         typeof window !== "undefined"
           ? window.location.origin
           : "https://project-stewart.com";
+
       const params = new URLSearchParams(
         typeof window !== "undefined" ? window.location.search : ""
       );
       const next = params.get("next") ?? "/home";
-      const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(
-        next
-      )}`;
+      const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo, // ← force our server callback (sets HttpOnly cookies)
+          redirectTo,               // our server callback (sets HttpOnly cookies)
+          flowType: "pkce",         // <-- force PKCE so /auth/callback gets ?code=...
           queryParams: {
             access_type: "offline",
             prompt: "consent",
             hd: "exprealty.net",
           },
-        },
+        } as any, // hush older typings
       });
 
       if (error) throw error;

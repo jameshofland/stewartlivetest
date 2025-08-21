@@ -7,7 +7,6 @@ export async function GET(req: Request) {
   const next = url.searchParams.get("next") || "/home";
   const code = url.searchParams.get("code");
 
-  // In route handlers, mutate the implicit response by using cookies().set(...)
   const jar = cookies();
 
   const supabase = createServerClient(
@@ -20,7 +19,7 @@ export async function GET(req: Request) {
           jar.set({ name: n, value: v, ...o }),
         remove: (n: string, o: CookieOptions) =>
           jar.set({ name: n, value: "", ...o, expires: new Date(0) }),
-      } as any, // (quiet TS for now)
+      } as any,
     }
   );
 
@@ -32,6 +31,11 @@ export async function GET(req: Request) {
     );
     return NextResponse.redirect(dest);
   }
+
+  // Optional: bubble what came back if code is missing (handy for debugging)
+  // return NextResponse.redirect(
+  //   new URL(`/login?error=NoCode&qs=${encodeURIComponent(url.search)}`, url.origin)
+  // );
 
   return NextResponse.redirect(
     new URL("/login?error=Authentication%20failed", url.origin)
