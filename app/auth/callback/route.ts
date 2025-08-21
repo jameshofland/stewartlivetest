@@ -1,4 +1,3 @@
-// app/auth/callback/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
@@ -8,8 +7,7 @@ export async function GET(req: Request) {
   const next = url.searchParams.get("next") || "/home";
   const code = url.searchParams.get("code");
 
-  // collect Set-Cookie here, then reuse headers in the redirect
-  const carry = NextResponse.next();
+  // In route handlers, mutate the implicit response by using cookies().set(...)
   const jar = cookies();
 
   const supabase = createServerClient(
@@ -19,20 +17,23 @@ export async function GET(req: Request) {
       cookies: {
         get: (n: string) => jar.get(n)?.value,
         set: (n: string, v: string, o: CookieOptions) =>
-          carry.cookies.set({ name: n, value: v, ...o }),
+          jar.set({ name: n, value: v, ...o }),
         remove: (n: string, o: CookieOptions) =>
-          carry.cookies.set({ name: n, value: "", ...o, expires: new Date(0) }),
-      } as any, // <-- quiet TS for now
+          jar.set({ name: n, value: "", ...o, expires: new Date(0) }),
+      } as any, // (quiet TS for now)
     }
   );
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    const to = new URL(error ? `/login?error=${encodeURIComponent(error.message)}` : next, url.origin);
-    carry.headers.set("Location", to.toString());
-    return new NextResponse(null, { status: 302, headers: carry.headers });
+    const dest = new URL(
+      error ? `/login?error=${encodeURIComponent(error.message)}` : next,
+      url.origin
+    );
+    return NextResponse.redirect(dest);
   }
 
-  carry.headers.set("Location", new URL("/login?error=Authentication%20failed", url.origin).toString());
-  return new NextResponse(null, { status: 302, headers: carry.headers });
+  return NextResponse.redirect(
+    new URL("/login?error=Authentication%20failed", url.origin)
+  );
 }
