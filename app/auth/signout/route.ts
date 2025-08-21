@@ -11,20 +11,20 @@ type SupabaseCookieAdapter = {
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  // allow ?next=/somewhere (optional)
   const next = url.searchParams.get("next") || "/login";
 
-  const cookieStore = cookies();
+  const carry = NextResponse.next();
+  const reqCookies = cookies();
 
   const cookiesAdapter: SupabaseCookieAdapter = {
     get(name) {
-      return cookieStore.get(name)?.value;
+      return reqCookies.get(name)?.value;
     },
     set(name, value, options) {
-      cookieStore.set({ name, value, ...options });
+      carry.cookies.set({ name, value, ...options });
     },
     remove(name, options) {
-      cookieStore.set({ name, value: "", ...options, expires: new Date(0) });
+      carry.cookies.set({ name, value: "", ...options, expires: new Date(0) });
     },
   };
 
@@ -36,6 +36,6 @@ export async function GET(req: Request) {
 
   await supabase.auth.signOut();
 
-  // after clearing cookies, send them to login (or ?next)
-  return NextResponse.redirect(new URL(next, url.origin));
+  const to = new URL(next, url.origin);
+  return NextResponse.redirect(to, { headers: carry.headers });
 }

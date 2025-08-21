@@ -1,23 +1,32 @@
+// app/auth/callback/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+
+type SupabaseCookieAdapter = {
+  get(name: string): string | undefined;
+  set(name: string, value: string, options: CookieOptions): void;
+  remove(name: string, options: CookieOptions): void;
+};
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const next = url.searchParams.get("next") || "/home";
   const code = url.searchParams.get("code");
 
-  const cookieStore = cookies();
+  // This response will collect Set-Cookie from Supabase
+  const carry = NextResponse.next();
+  const reqCookies = cookies();
 
-  const cookiesAdapter = {
-    get(name: string) {
-      return cookieStore.get(name)?.value;
+  const cookiesAdapter: SupabaseCookieAdapter = {
+    get(name) {
+      return reqCookies.get(name)?.value;
     },
-    set(name: string, value: string, options: CookieOptions) {
-      cookieStore.set({ name, value, ...options });
+    set(name, value, options) {
+      carry.cookies.set({ name, value, ...options });
     },
-    remove(name: string, options: CookieOptions) {
-      cookieStore.set({ name, value: "", ...options, expires: new Date(0) });
+    remove(name, options) {
+      carry.cookies.set({ name, value: "", ...options, expires: new Date(0) });
     },
   };
 
@@ -30,11 +39,15 @@ export async function GET(req: Request) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
-      return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, url.origin));
+      const to = new URL(`/login?error=${encodeURIComponent(error.message)}`, url.origin);
+      return NextResponse.redirect(to, { headers: carry.headers });
     }
-    // session cookies are now set on this response by cookieStore
-    return NextResponse.redirect(new URL(next, url.origin));
+    // Redirect to 'next', forwarding the Set-Cookie headers we collected
+    const to = new URL(next, url.origin);
+    return NextResponse.redirect(to, { headers: carry.headers });
   }
 
-  return NextResponse.redirect(new URL("/login?error=Authentication%20failed", url.origin));
+  return NextResponse.redirect(new URL("/login?error=Authentication%20failed", url.origin), {
+    headers: carry.headers,
+  });
 }
