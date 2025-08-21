@@ -14,8 +14,14 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "Project Stewart",
   description: "eXp's data, reimagined.",
-    generator: 'v0.dev'
-}
+  generator: "v0.dev",
+  // 👇 add this
+  robots: {
+    index: false,
+    follow: false,
+    // (If TS complains about extra flags like `noarchive`, skip them—our HTTP header already covers it)
+  },
+};
 
 export default function RootLayout({
   children,

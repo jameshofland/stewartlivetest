@@ -1,7 +1,7 @@
 // app/auth/callback/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -9,21 +9,25 @@ export async function GET(req: Request) {
   const code = url.searchParams.get("code");
 
   const cookieStore = cookies();
-  const supabase = createServerClient({
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+
+  // ✅ Use the 3‑arg createServerClient signature
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, // anon key is fine here; DO NOT use service-role
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          cookieStore.set(name, value, options);
+        },
+        remove(name: string, options: CookieOptions) {
+          cookieStore.set(name, "", { ...options, expires: new Date(0) });
+        },
       },
-      set(name: string, value: string, options: any) {
-        cookieStore.set({ name, value, ...options });
-      },
-      remove(name: string, options: any) {
-        cookieStore.set({ name, value: "", expires: new Date(0), ...options });
-      },
-    },
-  });
+    }
+  );
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -35,6 +39,8 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL(next, url));
   }
 
-  // If we landed here without a code, just go back to login
-  return NextResponse.redirect(new URL("/login?error=Authentication%20failed", url));
+  // No code → bounce to login
+  return NextResponse.redirect(
+    new URL("/login?error=Authentication%20failed", url)
+  );
 }
