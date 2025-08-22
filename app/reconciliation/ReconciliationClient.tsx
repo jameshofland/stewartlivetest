@@ -16,6 +16,32 @@ import { HomeButton } from "@/components/navigation"; // named import
 
 const supabase = getSupabaseBrowserClient();
 
+async function saveTransactionNotes(
+  id: string,
+  values: { ta_notes?: string; lead_notes?: string }
+) {
+  const supabase = getSupabaseBrowserClient();
+
+  // Build a strict payload so we never send disallowed keys.
+  const payload: Record<string, string> = {};
+  if (typeof values.ta_notes === "string") payload.ta_notes = values.ta_notes;
+  if (typeof values.lead_notes === "string") payload.lead_notes = values.lead_notes;
+
+  if (Object.keys(payload).length === 0) return; // nothing to update
+
+  const { error } = await supabase.from("transactions").update(payload).eq("id", id);
+  if (error) throw error;
+}
+
+async function assignUnmatchedTA(id: string, assigned_ta: string) {
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase
+    .from("unmatched_trx_data")
+    .update({ assigned_ta }) // <-- exact column name in your DB
+    .eq("id", id);
+  if (error) throw error;
+}
+
 interface Transaction {
   id: string
   ta_name: string
