@@ -406,45 +406,33 @@ export default function TransactionDashboard({ initialSummary, initialMatched, i
     return () => clearTimeout(timer)
   }, [unmatchedSearchTerm, activeTab])
 
-  const updateTransaction = async (id: string, field: string, value: string) => {
-  try {
-    const { error } = await supabase
-      .from("transactions")
-      .update({
-        [field]: value,
-        last_updated: new Date().toISOString(),
-      })
-      .eq("id", id)
-
-    if (!error) {
-      setTransactions((prev) =>
-        prev.map((t) =>
-          t.id === id ? { ...t, [field]: value, last_updated: new Date().toISOString() } : t
-        ),
-      )
-      // 👇 Add this line to refresh the top counters after an update
-      fetchSummary()
-    } else {
-      console.error("Error updating transaction:", error)
-    }
-  } catch (error) {
-    console.error("Error updating transaction:", error)
-  }
-}
+  const updateTransactionNotes = async (
+    id: string,
+    field: "ta_notes" | "lead_notes",
+    value: string
+  ) => {
+    // send only the allowed column
+    const payload = field === "ta_notes" ? { ta_notes: value } : { lead_notes: value };
+    await saveTransactionNotes(id, payload);
+  
+    // optimistic UI update
+    setTransactions((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, [field]: value, last_updated: new Date().toISOString() } : t
+      ),
+    );
+  
+    // refresh the summary cards
+    fetchSummary();
+  };
+  
 
   const updateUnmatchedTransaction = async (id: string, assignedTa: string) => {
-    try {
-      const { error } = await supabase.from("unmatched_trx_data").update({ assigned_ta: assignedTa }).eq("id", id)
-
-      if (!error) {
-        setUnmatchedTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, assigned_ta: assignedTa } : t)))
-      } else {
-        console.error("Error updating unmatched transaction:", error)
-      }
-    } catch (error) {
-      console.error("Error updating unmatched transaction:", error)
-    }
-  }
+    await assignUnmatchedTA(id, assignedTa);
+    setUnmatchedTransactions((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, assigned_ta: assignedTa } : t)),
+    );
+  };  
 
   const fmtMoney = (n?: number | string | null) =>
     n === null || n === undefined || n === ''
@@ -686,7 +674,7 @@ export default function TransactionDashboard({ initialSummary, initialMatched, i
                                       )}
                                       <Select
                                         value={transaction.ta_notes}
-                                        onValueChange={(value) => updateTransaction(transaction.id, "ta_notes", value)}
+                                        onValueChange={(value) => updateTransactionNotes(transaction.id, "ta_notes", value)}
                                       >
                                         <SelectTrigger className="w-32">
                                           <SelectValue />
@@ -704,7 +692,7 @@ export default function TransactionDashboard({ initialSummary, initialMatched, i
                                   <TableCell>
                                     <Select
                                       value={transaction.lead_notes}
-                                      onValueChange={(value) => updateTransaction(transaction.id, "lead_notes", value)}
+                                      onValueChange={(value) => updateTransactionNotes(transaction.id, "lead_notes", value)}
                                     >
                                       <SelectTrigger className="w-36">
                                         <SelectValue />
