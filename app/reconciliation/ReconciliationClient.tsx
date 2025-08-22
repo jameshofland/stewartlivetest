@@ -803,12 +803,19 @@ export default function TransactionDashboard({ initialSummary, initialMatched, i
                                   <TableCell>{transaction.region_name}</TableCell>
                                   <TableCell>{transaction.coe_date}</TableCell>
                                   <TableCell>
-                                    <Input
-                                      value={transaction.assigned_ta || ""}
-                                      onChange={(e) => updateUnmatchedTransaction(transaction.id, e.target.value)}
-                                      placeholder="Assign TA..."
-                                      className="w-32"
-                                    />
+                                  <Input
+                                    defaultValue={transaction.assigned_ta ?? ""}                                   // ← uncontrolled
+                                    onKeyDown={async (e) => {
+                                      if (e.key === "Enter") {
+                                        const v = (e.currentTarget as HTMLInputElement).value.trim();
+                                        if (v !== (transaction.assigned_ta ?? "")) await updateUnmatchedTransaction(transaction.id, v);
+                                      }
+                                    }}
+                                    onBlur={async (e) => {
+                                     const v = e.currentTarget.value.trim();
+                                     if (v !== (transaction.assigned_ta ?? "")) await updateUnmatchedTransaction(transaction.id, v);
+                                   }}
+                                  />
                                   </TableCell>
                                   <TableCell>
                                     <Badge variant="outline">{transaction.flagged_reason}</Badge>
